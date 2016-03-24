@@ -5,11 +5,11 @@ File: gcexport.py
 Author: Kyle Krafka (https://github.com/kjkjava/)
 Date: April 28, 2015
 
-Description:	Use this script to export your fitness data from Garmin Connect.
-				See README.md for more information.
+Description:    Use this script to export your fitness data from Garmin Connect.
+                See README.md for more information.
 """
 
-from urllib import urlencode
+from urllib.parse import urlencode
 from datetime import datetime
 from getpass import getpass
 from sys import argv
@@ -19,7 +19,7 @@ from os import mkdir
 from os import remove
 from xml.dom.minidom import parseString
 
-import urllib2, cookielib, json
+import urllib.request, urllib.error, urllib.parse, http.cookiejar, json
 from fileinput import filename
 
 import argparse
@@ -41,27 +41,27 @@ parser.add_argument('--username', help="your Garmin Connect username (otherwise,
 parser.add_argument('--password', help="your Garmin Connect password (otherwise, you will be prompted)", nargs='?')
 
 parser.add_argument('-c', '--count', nargs='?', default="1",
-	help="number of recent activities to download, or 'all' (default: 1)")
+    help="number of recent activities to download, or 'all' (default: 1)")
 
 parser.add_argument('-f', '--format', nargs='?', choices=['gpx', 'tcx', 'original'], default="gpx",
-	help="export format; can be 'gpx', 'tcx', or 'original' (default: 'gpx')")
+    help="export format; can be 'gpx', 'tcx', or 'original' (default: 'gpx')")
 
 parser.add_argument('-d', '--directory', nargs='?', default=activities_directory,
-	help="the directory to export to (default: './YYYY-MM-DD_garmin_connect_export')")
+    help="the directory to export to (default: './YYYY-MM-DD_garmin_connect_export')")
 
 parser.add_argument('-u', '--unzip',
-	help="if downloading ZIP files (format: 'original'), unzip the file and removes the ZIP file",
-	action="store_true")
+    help="if downloading ZIP files (format: 'original'), unzip the file and removes the ZIP file",
+    action="store_true")
 
 parser.add_argument('-r', '--reverse',
-	help="start with oldest activity (otherwise starts with newest)",
-	action="store_true")
+    help="start with oldest activity (otherwise starts with newest)",
+    action="store_true")
     
 args = parser.parse_args()
 
 if args.version:
-	print argv[0] + ", version " + script_version
-	exit(0)
+    print(argv[0] + ", version " + script_version)
+    exit(0)
 
 # Convert the count to integer or empty if all.
 if args.count == 'all': 
@@ -69,11 +69,11 @@ if args.count == 'all':
 else:
     total_to_download = int(args.count)
 
-print 'Welcome to Garmin Connect Exporter!'
+print('Welcome to Garmin Connect Exporter!')
 
 # Create directory for data files.
 if isdir(args.directory):
-	print 'Warning: Output directory already exists. Will skip already-downloaded files and append to the CSV file.'
+    print('Warning: Output directory already exists. Will skip already-downloaded files and append to the CSV file.')
 
 username = args.username if args.username else raw_input('Username: ')
 password = args.password if args.password else getpass()
@@ -82,7 +82,7 @@ password = args.password if args.password else getpass()
 garmin_handler = GarminHandler( username, password )
 
 if not isdir(args.directory):
-	mkdir(args.directory)
+    mkdir(args.directory)
 
 csv_filename = args.directory + '/activities.csv'
 csv_existed = isfile(csv_filename)
@@ -91,7 +91,7 @@ csv_file = open(csv_filename, 'a')
 
 # Write header to CSV file
 if not csv_existed:
-	csv_file.write('Activity ID,Activity Name,Description,Begin Timestamp,Begin Timestamp (Raw Milliseconds),End Timestamp,End Timestamp (Raw Milliseconds),Device,Activity Parent,Activity Type,Event Type,Activity Time Zone,Max. Elevation,Max. Elevation (Raw),Begin Latitude (Decimal Degrees Raw),Begin Longitude (Decimal Degrees Raw),End Latitude (Decimal Degrees Raw),End Longitude (Decimal Degrees Raw),Average Moving Speed,Average Moving Speed (Raw),Max. Heart Rate (bpm),Average Heart Rate (bpm),Max. Speed,Max. Speed (Raw),Calories,Calories (Raw),Duration (h:m:s),Duration (Raw Seconds),Moving Duration (h:m:s),Moving Duration (Raw Seconds),Average Speed,Average Speed (Raw),Distance,Distance (Raw),Max. Heart Rate (bpm),Min. Elevation,Min. Elevation (Raw),Elevation Gain,Elevation Gain (Raw),Elevation Loss,Elevation Loss (Raw)\n')
+    csv_file.write('Activity ID,Activity Name,Description,Begin Timestamp,Begin Timestamp (Raw Milliseconds),End Timestamp,End Timestamp (Raw Milliseconds),Device,Activity Parent,Activity Type,Event Type,Activity Time Zone,Max. Elevation,Max. Elevation (Raw),Begin Latitude (Decimal Degrees Raw),Begin Longitude (Decimal Degrees Raw),End Latitude (Decimal Degrees Raw),End Longitude (Decimal Degrees Raw),Average Moving Speed,Average Moving Speed (Raw),Max. Heart Rate (bpm),Average Heart Rate (bpm),Max. Speed,Max. Speed (Raw),Calories,Calories (Raw),Duration (h:m:s),Duration (Raw Seconds),Moving Duration (h:m:s),Moving Duration (Raw Seconds),Average Speed,Average Speed (Raw),Distance,Distance (Raw),Max. Heart Rate (bpm),Min. Elevation,Min. Elevation (Raw),Elevation Gain,Elevation Gain (Raw),Elevation Loss,Elevation Loss (Raw)\n')
 
 # Create generator for activities. Generates activities until specified number of activities are retrieved.
 # Activity is a dictionary object of the json. (without the redundant first 'activity' key)
@@ -99,23 +99,23 @@ activities_generator = garmin_handler.activitiesGenerator( limit = total_to_down
 
 for a in activities_generator:
     # Display which entry we're working on.
-    print 'Garmin Connect activity: [' + a['activityId'] + ']',
-    print a['activityName']['value']
-    print '\t' + a['beginTimestamp']['display'] + ',',
+    print('Garmin Connect activity: [' + a['activityId'] + ']')
+    print(a['activityName']['value'])
+    print('\t' + a['beginTimestamp']['display'] + ',')
     if 'sumElapsedDuration' in a:
-        print a['sumElapsedDuration']['display'] + ',',
+        print(a['sumElapsedDuration']['display'] + ',')
     else:
-        print '??:??:??,',
+        print('??:??:??,')
     if 'sumDistance' in a:
-        print a['sumDistance']['withUnit']
+        print(a['sumDistance']['withUnit'])
     else:
-        print '0.00 Miles'
+        print('0.00 Miles')
     
     # Download the data file from Garmin Connect.
     # If the download fails (e.g., due to timeout), this script will die, but nothing
     # will have been written to disk about this activity, so just running it again
     # should pick up where it left off.
-    print '\tDownloading file...'
+    print('\tDownloading file...')
     data = garmin_handler.getFileByID( a['activityId'], args.format )
     
     if args.format == 'original':
@@ -127,14 +127,14 @@ for a in activities_generator:
         file_mode = 'w'
 
     if isfile(data_filename):
-        print '\tData file already exists; skipping...'
+        print('\tData file already exists; skipping...')
         continue
     if args.format == 'original' and isfile(fit_filename):  # Regardless of unzip setting, don't redownload if the ZIP or FIT file exists.
-        print '\tFIT data file already exists; skipping...'
+        print('\tFIT data file already exists; skipping...')
         continue
 
     save_file = open(data_filename, file_mode)
-    save_file.write(data)
+    save_file.write(str(data))
     save_file.close()
 
     # Write stats to CSV.
@@ -185,7 +185,7 @@ for a in activities_generator:
     csv_record += empty_record if 'lossElevation' not in a else '"' + a['lossElevation']['value'].replace('"', '""') + '"'
     csv_record += '\n'
 
-    csv_file.write(csv_record.encode('utf8'))
+    csv_file.write(csv_record)
     
     # TODO MM replace csv creation thing by:
     # activity_obj = ActivityJSON( activity_dict )
@@ -215,23 +215,23 @@ for a in activities_generator:
         gpx_data_exists = len(gpx.getElementsByTagName('trkpt')) > 0
 
         if gpx_data_exists:
-            print 'Done. GPX data saved.'
+            print('Done. GPX data saved.')
         else:
-            print 'Done. No track points found.'
+            print('Done. No track points found.')
     elif args.format == 'original':
         if args.unzip and data_filename[-3:].lower() == 'zip':  # Even manual upload of a GPX file is zipped, but we'll validate the extension.
-            print "Unzipping and removing original files...",
+            print("Unzipping and removing original files...")
             zip_file = open(data_filename, 'rb')
             z = zipfile.ZipFile(zip_file)
             for name in z.namelist():
                 z.extract(name, args.directory)
             zip_file.close()
             remove(data_filename)
-        print 'Done.'
+        print('Done.')
     else:
         # TODO: Consider validating other formats.
-        print 'Done.'
+        print('Done.')
          
 csv_file.close()
 
-print 'Done!'
+print('Done!')
