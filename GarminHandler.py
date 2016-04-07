@@ -19,26 +19,26 @@ class GarminHandler( object ):
     URL_TCX_ACTIVITY = 'http://connect.garmin.com/proxy/activity-service-1.1/tcx/activity/%s?full=true'
     URL_ZIP_ACTIVITY = 'http://connect.garmin.com/proxy/download-service/files/activity/%s'
     URL_CSV_ACTIVITY = 'http://connect.garmin.com/csvExporter/%s.csv'
-    JSON_DOWNLOAD_LIMIT = 100 # Maximum number of activities to request at once. 100 is the maximum set and enforced by Garmin. 
+    JSON_DOWNLOAD_LIMIT = 100 # Maximum number of activities to request at once. 100 is the maximum set and enforced by Garmin.
     #JSON_DOWNLOAD_LIMIT = 10 # but 10 is faster if few activities to retrieve.
-    
+
     def __init__( self, username, password ):
         self.opener = None
-        # You must be logged in to use the class 
+        # You must be logged in to use the class
         self.login( username, password )
-        
+
     def login( self, username, password ):
         """ Returns True if logged in, raises error if not."""
         # Initially, we need to get a valid session cookie, so we pull the login page.
         cookie_jar = http.cookiejar.CookieJar()
         self.opener = urllib.request.build_opener( urllib.request.HTTPCookieProcessor(cookie_jar) )
         http_req( self.opener, self.URL_LOGIN )
-        
+
         # Now we'll actually login. Post data with Fields that are passed in a typical Garmin login.
-        post_data = {'username': username, 'password': password, 
-                     'embed': 'true', 'lt': 'e1s1', '_eventId': 'submit', 'displayNameRequired': 'false'} 
+        post_data = {'username': username, 'password': password,
+                     'embed': 'true', 'lt': 'e1s1', '_eventId': 'submit', 'displayNameRequired': 'false'}
         http_req ( self.opener, self.URL_LOGIN, post_data )
-        
+
         # Get the key.
         # TODO: Can we do this without iterating?
         login_ticket = None
@@ -46,27 +46,27 @@ class GarminHandler( object ):
             if cookie.name == 'CASTGC':
                 login_ticket = cookie.value
                 break
-        
+
         if not login_ticket:
             raise Exception('Did not get a ticket cookie. Cannot log in. Did you enter the correct username and password?')
-        
+
         # Post Authorize. Chop of 'TGT-' off the beginning, prepend 'ST-0'.
         login_ticket = 'ST-0' + login_ticket[4:]
         http_req( self.opener, self.URL_POST_AUTH + 'ticket=' + login_ticket)
-        
+
         #TODO: extra check whether indeed logged in.
-        return True  
-        
+        return True
+
     def activitiesGenerator( self, limit = None, reversed = False ):
-        """ Yields the json as dict for every activity found, 
+        """ Yields the json as dict for every activity found,
             either from new to old or reversed. """
-        
+
         # Prevent downloading too large chunks (saves time)
         if limit and limit < self.JSON_DOWNLOAD_LIMIT:
             max_chunk_size = limit
         else:
             max_chunk_size = self.JSON_DOWNLOAD_LIMIT
-        
+
         # Determine index to start at
         if reversed:
             # Download one activity. Result will contain how many activities
@@ -81,7 +81,7 @@ class GarminHandler( object ):
                 start_index = 0
         else:
             start_index = 0
-        
+
         # Download data in multiple chunks of *max_chunk_size* activities
         total_downloaded = 0
         downloaded_chunk_size = max_chunk_size #initialize
@@ -94,23 +94,23 @@ class GarminHandler( object ):
                 json_results = json.loads(result.decode('utf-8'))
             except urllib.request.HTTPError as e:
                 raise Exception('Failed to retrieve json of activities. (' + str(e) + ').')
-            
+
             # Pull out just the list of activities.
             activities = json_results['results']['activities']
             downloaded_chunk_size = len(activities)
-            
+
             if reversed:
                 activities = activities[::-1] #reverse
-                
+
             for activity in activities:
                 activity_details = activity['activity']
                 yield activity_details
-                
-                total_downloaded += 1                
+
+                total_downloaded += 1
                 # Stop if limit is reached
                 if total_downloaded == limit:
                     raise StopIteration
-            
+
             # Increment start index
             if reversed:
                 if start_index - max_chunk_size < 0: # Negative start is not allowed
@@ -120,40 +120,40 @@ class GarminHandler( object ):
                     start_index -= max_chunk_size #Backwards
             else:
                 start_index += max_chunk_size #Forwards
-        
+
     def getNewRuns( self, existing_ids ):
-        """ Iterate until an existing activiity is found. 
+        """ Iterate until an existing activiity is found.
             Returns list of new activities. """
-        
+
         activities = self.activitiesGenerator()
         for activity_dict in activities:
             act = ActivityJSON( activity_dict )
-            
+
             act_id = act.getID()
             if act_id in existing_ids:
                 break
-            
+
             if act.isRun():
                 yield activity_dict
-                
+
     def getFileByID( self, activity_id, fileformat = 'tcx' ):
         """ Downloads and returns data of given activity """
-        
+
         if fileformat == 'tcx':
             download_url = self.URL_TCX_ACTIVITY % activity_id
-            
+
         elif fileformat == 'gpx':
             download_url = self.URL_GPX_ACTIVITY % activity_id
-            
+
         elif fileformat == 'original':
             download_url = self.URL_ZIP_ACTIVITY % activity_id
-            
+
         elif fileformat == 'csv': #lap data
             download_url = self.URL_CSV_ACTIVITY % activity_id
-            
+
         else:
             raise Exception('Unrecognized download file format. Supported: tcx,gpx,original and csv')
-        
+
         # Download
         try:
             data = http_req( self.opener, download_url )
@@ -171,8 +171,8 @@ class GarminHandler( object ):
                 data = ''
             else:
                 raise Exception('Failed. Got an unexpected HTTP error (' + str(e.code) + ').')
-                
-        return data   
+
+        return data
 
 ## End of Class ##
 
@@ -191,4 +191,4 @@ def http_req(opener, url, post=None, headers={}):
     if response.getcode() != 200:
         raise Exception('Bad return code (' + response.getcode() + ') for: ' + url)
 
-    return response.read()   
+    return response.read()
