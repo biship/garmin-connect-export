@@ -13,7 +13,7 @@ import requests
 import argparse
 import zipfile
 import logging
-
+import json
 
 CURRENT_DATE = datetime.now().strftime('%Y-%m-%d')
 
@@ -45,9 +45,9 @@ parser.add_argument('-c', '--count', nargs='?', default="1",
 
 
 parser.add_argument('-f', '--format', nargs='?',
-                    choices=['gpx', 'tcx', 'original'], default="gpx",
+                    choices=['gpx', 'tcx', 'original', 'json'], default="gpx",
                     help=("export format; can be 'gpx', 'tcx',"
-                          " or 'original' (default: 'gpx')"))
+                          " 'original', or 'json' (default: 'gpx')"))
 
 parser.add_argument('-d', '--directory', nargs='?',
                     default=DEFAULT_DIRECTORY,
@@ -288,6 +288,10 @@ with open(csv_fullpath, 'ab') as csv_file:
                                 .format(url_gc_tcx_activity, info["id"]))
                 file_mode = 'w'
 
+            elif args.format == "json":
+                data_filename = "activity_{}.json".format(info["id"])
+                file_mode = 'w'
+
             elif args.format == "original":
                 data_filename = "activity_{}.zip".format(info["id"])
 
@@ -295,7 +299,6 @@ with open(csv_fullpath, 'ab') as csv_file:
 
                 download_url = url_gc_original_activity + info["id"]
                 file_mode = 'wb'
-
             else:
                 raise Exception('Unrecognized format.')
 
@@ -305,13 +308,16 @@ with open(csv_fullpath, 'ab') as csv_file:
             # Increase the count now, since we want to count skipped files.
             total_downloaded += 1
 
-            if os.path.isfile(file_path):
-                logging.info('%s already exists; skipping...', data_filename)
+            if args.format == "json":
+                with open(file_path, file_mode) as save_file:
+                    save_file.write(json.dumps(A, indent=2))
                 continue
 
-            # Regardless of unzip setting, don't redownload if the ZIP or FIT file
-            # exists.
-            if args.format == 'original' and os.path.isfile(fit_filename):
+            if (os.path.isfile(file_path) or
+                    # Regardless of unzip setting, don't redownload if the
+                    # ZIP or FIT file exists.
+                    (args.format == 'original' and
+                        os.path.isfile(fit_filename))):
                 logging.info('%s already exists; skipping...', data_filename)
                 continue
 
