@@ -90,10 +90,10 @@ if os.path.isdir(args.directory):
 limit_maximum = 100
 
 # URLs for various services.
-GC_CONNECT = 'https://connect.garmin.com/'
-REDIRECT = GC_CONNECT + 'post-auth/login'
-BASE_URL = GC_CONNECT + 'en-US/signin'
-GAUTH = GC_CONNECT + 'gauth/hostname'
+GCU = 'https://connect.garmin.com/'
+REDIRECT = GCU + 'post-auth/login'
+BASE_URL = GCU + 'en-US/signin'
+GAUTH = GCU + 'gauth/hostname'
 SSO = 'https://sso.garmin.com/sso'
 CSS = ('https://static.garmincdn.com/com.garmin.connect/ui/css/'
        'gauth-custom-v1.1-min.css')
@@ -121,17 +121,12 @@ data = {'service': REDIRECT,
 
 
 url_gc_login = 'https://sso.garmin.com/sso/login?' + urlencode(data)
-
-url_gc_post_auth = GC_CONNECT + 'post-auth/login?'
-
-url_gc_search = (GC_CONNECT
-                 + 'proxy/activity-search-service-1.2/json/activities?')
-url_gc_gpx_activity = (GC_CONNECT
-                       + 'modern/proxy/download-service/export/gpx/activity/')
-url_gc_tcx_activity = (GC_CONNECT
-                       + 'modern/proxy/download-service/export/tcx/activity/')
-url_gc_original_activity = (GC_CONNECT
-                            + 'proxy/download-service/files/activity/')
+url_gc_post_auth = GCU + 'post-auth/login?'
+url_gc_search = GCU + 'proxy/activity-search-service-1.2/json/activities?'
+modern_export = 'modern/proxy/download-service/export/'
+url_gc_gpx_activity = GCU + modern_export + 'gpx/activity/'
+url_gc_tcx_activity = GCU + modern_export + 'tcx/activity/'
+url_gc_original_activity = GCU + 'proxy/download-service/files/activity/'
 
 
 def logged_in_session(username, password):
@@ -148,14 +143,12 @@ def logged_in_session(username, password):
 
     # Now we'll actually login, using
     # fields that are passed in a typical Garmin login.
-    post_data = {
-        'username': username,
-        'password': password,
-        'embed': 'true',
-        'lt': 'e1s1',
-        '_eventId': 'submit',
-        'displayNameRequired': 'false'
-    }
+    post_data = {'username': username,
+                 'password': password,
+                 'embed': 'true',
+                 'lt': 'e1s1',
+                 '_eventId': 'submit',
+                 'displayNameRequired': 'false'}
 
     r2 = sesh.post(url_gc_login, data=post_data)
 
@@ -164,10 +157,8 @@ def logged_in_session(username, password):
         login_ticket = 'ST-0' + r2.cookies['CASTGC'][4:]
 
     else:
-        raise Exception(
-            'Did not get a ticket cookie. Cannot log in.'
-            ' Did you enter the correct username and password?'
-        )
+        raise Exception('Did not get a ticket cookie. Cannot log in.'
+            ' Did you enter the correct username and password?')
 
     r3 = sesh.post(url_gc_post_auth, params={'ticket': login_ticket})
 
@@ -178,10 +169,10 @@ def logged_in_session(username, password):
 sesh = logged_in_session(username, password)
 
 print('Call modern')
-sesh.get(GC_CONNECT + 'modern')
+sesh.get(GCU + 'modern')
 print('Finish modern')
 print('Call legacy session')
-sesh.get(GC_CONNECT + 'legacy/session')
+sesh.get(GCU + 'legacy/session')
 print('Finish legacy session')
 
 if not os.path.isdir(args.directory):
