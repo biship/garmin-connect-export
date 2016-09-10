@@ -13,6 +13,7 @@ import argparse
 import zipfile
 import logging
 import json
+from urllib.parse import urlencode
 
 
 CURRENT_DATE = datetime.now().strftime('%Y-%m-%d')
@@ -83,27 +84,34 @@ if os.path.isdir(args.directory):
 limit_maximum = 100
 
 # URLs for various services.
-url_gc_login = ("https://sso.garmin.com/sso/login?"
-                "service=https://connect.garmin.com/post-auth/login"
-                "&webhost=olaxpw-connect04"
-                "&source=https://connect.garmin.com/en-US/signin"
-                "&redirectAfterAccountLoginUrl=https://connect.garmin.com/post-auth/login"
-                "&redirectAfterAccountCreationUrl=https://connect.garmin.com/post-auth/login"
-                "&gauthHost=https://sso.garmin.com/sso"
-                "&locale=en_US"
-                "&id=gauth-widget"
-                "&cssUrl=https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.1-min.css"
-                "&clientId=GarminConnect"
-                "&rememberMeShown=true"
-                "&rememberMeChecked=false"
-                "&createAccountShown=true"
-                "&openCreateAccount=false"
-                "&usernameShown=false"
-                "&displayNameShown=false"
-                "&consumeServiceTicket=false"
-                "&initialFocus=true"
-                "&embedWidget=false"
-                "&generateExtraServiceTicket=false")
+REDIRECT = "https://connect.garmin.com/post-auth/login"
+BASE_URL = "http://connect.garmin.com/en-US/signin"
+GAUTH = "http://connect.garmin.com/gauth/hostname"
+SSO = "https://sso.garmin.com/sso"
+CSS = "https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.1-min.css"
+
+data = {'service': REDIRECT,
+        'webhost': 'olaxpw-connect04',
+        'source': BASE_URL,
+        'redirectAfterAccountLoginUrl': REDIRECT,
+        'redirectAfterAccountCreationUrl': REDIRECT,
+        'gauthHost': SSO,
+        'locale': 'en_US',
+        'id': 'gauth-widget',
+        'cssUrl': CSS,
+        'clientId': 'GarminConnect',
+        'rememberMeShown': 'true',
+        'rememberMeChecked': 'false',
+        'createAccountShown': 'true',
+        'openCreateAccount': 'false',
+        'usernameShown': 'false',
+        'displayNameShown': 'false',
+        'consumeServiceTicket': 'false',
+        'initialFocus': 'true',
+        'embedWidget': 'false',
+        'generateExtraServiceTicket': 'false'}
+
+url_gc_login = 'https://sso.garmin.com/sso/login?' + urlencode(data)
 
 url_gc_post_auth = 'https://connect.garmin.com/post-auth/login?'
 
