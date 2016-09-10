@@ -18,47 +18,47 @@ from urllib.parse import urlencode
 
 CURRENT_DATE = datetime.now().strftime('%Y-%m-%d')
 
-logging.basicConfig(  # filename="import_{}.log".format(CURRENT_DATE),
+logging.basicConfig(  # filename='import_{}.log'.format(CURRENT_DATE),
     format='%(levelname)s:%(message)s',
     level=logging.DEBUG)  # use level=logging.INFO for less verbosity
 
 
 DEFAULT_DIRECTORY = './' + CURRENT_DATE + '_garmin_connect_export'
-CSV_FILENAME = "activities.csv"
+CSV_FILENAME = 'activities.csv'
 
 py2 = sys.version_info[0] < 3  # is this python 2?
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--username",
-                    help=("your Garmin Connect username "
-                          "(otherwise, you will be prompted)"),
+parser.add_argument('--username',
+                    help=('your Garmin Connect username '
+                          '(otherwise, you will be prompted)'),
                     nargs='?')
 
-parser.add_argument("--password",
-                    help=("your Garmin Connect password "
-                          "(otherwise, you will be prompted)"),
+parser.add_argument('--password',
+                    help=('your Garmin Connect password '
+                          '(otherwise, you will be prompted)'),
                     nargs='?')
 
-parser.add_argument('-c', '--count', nargs='?', default="1",
+parser.add_argument('-c', '--count', nargs='?', default='1',
                     help=("number of recent activities to download, or 'all'"
-                          " (default: 1)"))
+                          ' (default: 1)'))
 
 
 parser.add_argument('-f', '--format', nargs='?',
-                    choices=['gpx', 'tcx', 'original', 'json'], default="gpx",
+                    choices=['gpx', 'tcx', 'original', 'json'], default='gpx',
                     help=("export format; can be 'gpx', 'tcx',"
                           " 'original', or 'json' (default: 'gpx')"))
 
 parser.add_argument('-d', '--directory', nargs='?',
                     default=DEFAULT_DIRECTORY,
-                    help=("the directory to export to"
+                    help=('the directory to export to'
                           " (default: './YYYY-MM-DD_garmin_connect_export')"))
 
 parser.add_argument('-u', '--unzip',
                     help=("if downloading ZIP files (format: 'original'),"
-                          " unzip the file and removes the ZIP file"),
-                    action="store_true")
+                          ' unzip the file and removes the ZIP file'),
+                    action='store_true')
 
 args = parser.parse_args()
 
@@ -77,21 +77,22 @@ else:
 
 # Create directory for data files.
 if os.path.isdir(args.directory):
-    logging.info("Warning: Output directory already exists."
-                 " Will skip already-downloaded files and append to the"
-                 " CSV file.")
+    logging.info('Warning: Output directory already exists.'
+                 ' Will skip already-downloaded files and append to the'
+                 ' CSV file.')
 
 # Maximum number of activities you can request at once.  Set and enforced
 # by Garmin.
 limit_maximum = 100
 
 # URLs for various services.
-REDIRECT = "https://connect.garmin.com/post-auth/login"
-BASE_URL = "https://connect.garmin.com/en-US/signin"
-GAUTH = "https://connect.garmin.com/gauth/hostname"
-SSO = "https://sso.garmin.com/sso"
-CSS = ("https://static.garmincdn.com/com.garmin.connect/ui/css/"
-       "gauth-custom-v1.1-min.css")
+GC_CONNECT = 'https://connect.garmin.com/'
+REDIRECT = 'https://connect.garmin.com/post-auth/login'
+BASE_URL = 'https://connect.garmin.com/en-US/signin'
+GAUTH = 'https://connect.garmin.com/gauth/hostname'
+SSO = 'https://sso.garmin.com/sso'
+CSS = ('https://static.garmincdn.com/com.garmin.connect/ui/css/'
+       'gauth-custom-v1.1-min.css')
 
 data = {'service': REDIRECT,
         'webhost': 'olaxpw-connect04',
@@ -114,14 +115,13 @@ data = {'service': REDIRECT,
         'embedWidget': 'false',
         'generateExtraServiceTicket': 'false'}
 
+
 url_gc_login = 'https://sso.garmin.com/sso/login?' + urlencode(data)
 
 url_gc_post_auth = 'https://connect.garmin.com/post-auth/login?'
 
 url_gc_search = 'https://connect.garmin.com/proxy/activity-search-service-1.2/json/activities?'
-#url_gc_gpx_activity = 'http://connect.garmin.com/proxy/activity-service-1.1/gpx/activity/'
 url_gc_gpx_activity = 'https://connect.garmin.com/modern/proxy/download-service/export/gpx/activity/'
-#url_gc_tcx_activity = 'http://connect.garmin.com/proxy/activity-service-1.2/tcx/activity/'
 url_gc_tcx_activity = 'https://connect.garmin.com/modern/proxy/download-service/export/tcx/activity/'
 url_gc_original_activity = 'https://connect.garmin.com/proxy/download-service/files/activity/'
 
@@ -130,9 +130,9 @@ def logged_in_session(username, password):
     # Create a session that will persist thorughout this script
     sesh = requests.Session()
 
-    sesh.headers['User-Agent'] = ("Mozilla/5.0 (X11; Linux x86_64) "
-                                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                  "Chrome/29.0.1547.62 Safari/537.36")
+    sesh.headers['User-Agent'] = ('Mozilla/5.0 (X11; Linux x86_64) '
+                                  'AppleWebKit/537.36 (KHTML, like Gecko) '
+                                  'Chrome/29.0.1547.62 Safari/537.36')
 
     # Initially, we need to get a valid session cookie,
     # so we pull the login page.
@@ -151,17 +151,17 @@ def logged_in_session(username, password):
 
     r2 = sesh.post(url_gc_login, data=post_data)
 
-    if "CASTGC" in r2.cookies:
-        # Construct login ticket from the  cookie with "CASTCG" key
-        login_ticket = "ST-0" + r2.cookies["CASTGC"][4:]
+    if 'CASTGC' in r2.cookies:
+        # Construct login ticket from the  cookie with 'CASTCG' key
+        login_ticket = 'ST-0' + r2.cookies['CASTGC'][4:]
 
     else:
         raise Exception(
-            "Did not get a ticket cookie. Cannot log in."
-            " Did you enter the correct username and password?"
+            'Did not get a ticket cookie. Cannot log in.'
+            ' Did you enter the correct username and password?'
         )
 
-    r3 = sesh.post(url_gc_post_auth, params={"ticket": login_ticket})
+    r3 = sesh.post(url_gc_post_auth, params={'ticket': login_ticket})
 
     return sesh
 
@@ -169,17 +169,17 @@ def logged_in_session(username, password):
 # We should be logged in now.
 sesh = logged_in_session(username, password)
 
-print("Call modern")
-sesh.get("https://connect.garmin.com/modern")
-print("Finish modern")
-print("Call legacy session")
-sesh.get("https://connect.garmin.com/legacy/session")
-print("Finish legacy session")
+print('Call modern')
+sesh.get('https://connect.garmin.com/modern')
+print('Finish modern')
+print('Call legacy session')
+sesh.get('https://connect.garmin.com/legacy/session')
+print('Finish legacy session')
 
 if not os.path.isdir(args.directory):
     os.mkdir(args.directory)
 
-csv_fullpath = args.directory + "/" + CSV_FILENAME
+csv_fullpath = args.directory + '/' + CSV_FILENAME
 
 csv_existed = os.path.isfile(csv_fullpath)
 
@@ -232,57 +232,57 @@ while total_downloaded < total_to_download:
 
         # Display which entry we're working on.
         info = {
-            "id": A['activityId'],
-            "name": A['activityName'],
-            "timestamp": aSummary['BeginTimestamp']['display'],
-            "duration": "??:??:??",
-            "distance": "0.00 Miles"
+            'id': A['activityId'],
+            'name': A['activityName'],
+            'timestamp': aSummary['BeginTimestamp']['display'],
+            'duration': '??:??:??',
+            'distance': '0.00 Miles'
         }
 
-        if "SumElapsedDuration" in aSummary:
-            info["duration"] = aSummary["SumElapsedDuration"]["display"]
+        if 'SumElapsedDuration' in aSummary:
+            info['duration'] = aSummary['SumElapsedDuration']['display']
 
-        if "SumDistance" in A['activitySummary']:
-            info["distance"] = aSummary["SumDistance"]["withUnit"]
+        if 'SumDistance' in A['activitySummary']:
+            info['distance'] = aSummary['SumDistance']['withUnit']
 
-        logging.info("Garmin Connect activity: [{id}] {name}\n"
-                     "\t{timestamp}, {duration}, {distance}"
+        logging.info('Garmin Connect activity: [{id}] {name}\n'
+                     '\t{timestamp}, {duration}, {distance}'
                      .format(**info))
 
-        if args.format == "gpx":
-            data_filename = "activity_{}.gpx".format(info["id"])
-            download_url = ("{}{}?full=true"
-                            .format(url_gc_gpx_activity, info["id"]))
+        if args.format == 'gpx':
+            data_filename = 'activity_{}.gpx'.format(info['id'])
+            download_url = ('{}{}?full=true'
+                            .format(url_gc_gpx_activity, info['id']))
             file_mode = 'w'
 
-        elif args.format == "tcx":
-            data_filename = "activity_{}.tcx".format(info["id"])
+        elif args.format == 'tcx':
+            data_filename = 'activity_{}.tcx'.format(info['id'])
 
-            download_url = ("{}{}?full=true"
-                            .format(url_gc_tcx_activity, info["id"]))
+            download_url = ('{}{}?full=true'
+                            .format(url_gc_tcx_activity, info['id']))
             file_mode = 'w'
 
-        elif args.format == "json":
-            data_filename = "activity_{}.json".format(info["id"])
+        elif args.format == 'json':
+            data_filename = 'activity_{}.json'.format(info['id'])
             file_mode = 'w'
 
-        elif args.format == "original":
-            data_filename = "activity_{}.zip".format(info["id"])
+        elif args.format == 'original':
+            data_filename = 'activity_{}.zip'.format(info['id'])
 
-            fit_filename = info["id"] + ".fit"
+            fit_filename = info['id'] + '.fit'
 
-            download_url = url_gc_original_activity + info["id"]
+            download_url = url_gc_original_activity + info['id']
             file_mode = 'wb'
         else:
             raise Exception('Unrecognized format.')
 
         # file_path is the full path of the activity file to write
-        file_path = args.directory + "/" + data_filename
+        file_path = args.directory + '/' + data_filename
 
         # Increase the count now, since we want to count skipped files.
         total_downloaded += 1
 
-        if args.format == "json":
+        if args.format == 'json':
             with open(file_path, file_mode) as save_file:
                 save_file.write(json.dumps(A, indent=2))
             continue
@@ -319,27 +319,27 @@ while total_downloaded < total_to_download:
                 # generated here, but that's a bit much. Use the GPX format
                 # if you want actual data in every file, as I believe
                 # Garmin provides a GPX file for every activity.
-                logging.info("Writing empty file since Garmin did not"
-                             " generate a TCX file for this activity...")
+                logging.info('Writing empty file since Garmin did not'
+                             ' generate a TCX file for this activity...')
                 empty_file = True
 
             elif e.code == 404 and args.format == 'original':
                 # For manual activities (i.e., entered in online without a
                 # file upload), there is no original file.
                 # Write an empty file to prevent redownloading it.
-                logging.info("Writing empty file since there"
-                             " was no original activity data...")
+                logging.info('Writing empty file since there'
+                             ' was no original activity data...')
                 empty_file = True
             else:
                 raise Exception(
-                    "Failed. Got an unexpected HTTP error ({})."
+                    'Failed. Got an unexpected HTTP error ({}).'
                     .format(str(e.code))
                 )
 
         if empty_file:
-            data = ""
-        elif "b" in file_mode:
-            # if response contains binary data, i.e. file_mode is "wb"
+            data = ''
+        elif 'b' in file_mode:
+            # if response contains binary data, i.e. file_mode is 'wb'
             data = file_response.content
         else:
             # otherwise, data is (auto-detected, most likely utf8)
@@ -381,7 +381,7 @@ while total_downloaded < total_to_download:
             if (args.unzip and
                     file_path[-3:].lower() == 'zip' and
                     os.stat(file_path).st_size > 0):
-                logging.info("Unzipping and removing original files...")
+                logging.info('Unzipping and removing original files...')
                 zip_file = open(file_path, 'rb')
                 z = zipfile.ZipFile(zip_file)
                 for name in z.namelist():
@@ -391,5 +391,5 @@ while total_downloaded < total_to_download:
                 os.remove(file_path)
 
     # End while loop for multiple chunks.
-    logging.info("Chunk done!")
+    logging.info('Chunk done!')
 logging.info('Done!')
