@@ -14,6 +14,7 @@ import zipfile
 import logging
 import json
 
+
 CURRENT_DATE = datetime.now().strftime('%Y-%m-%d')
 
 logging.basicConfig(  # filename="import_{}.log".format(CURRENT_DATE),
@@ -106,9 +107,11 @@ url_gc_login = ("https://sso.garmin.com/sso/login?"
 
 url_gc_post_auth = 'https://connect.garmin.com/post-auth/login?'
 
-url_gc_search = 'http://connect.garmin.com/proxy/activity-search-service-1.0/json/activities?'
-url_gc_gpx_activity = 'http://connect.garmin.com/proxy/activity-service-1.1/gpx/activity/'
-url_gc_tcx_activity = 'http://connect.garmin.com/proxy/activity-service-1.1/tcx/activity/'
+url_gc_search = 'http://connect.garmin.com/proxy/activity-search-service-1.2/json/activities?'
+#url_gc_gpx_activity = 'http://connect.garmin.com/proxy/activity-service-1.1/gpx/activity/'
+url_gc_gpx_activity = 'https://connect.garmin.com/modern/proxy/download-service/export/gpx/activity/'
+#url_gc_tcx_activity = 'http://connect.garmin.com/proxy/activity-service-1.2/tcx/activity/'
+url_gc_tcx_activity = 'https://connect.garmin.com/modern/proxy/download-service/export/tcx/activity/'
 url_gc_original_activity = 'http://connect.garmin.com/proxy/download-service/files/activity/'
 
 
@@ -155,6 +158,13 @@ def logged_in_session(username, password):
 # We should be logged in now.
 sesh = logged_in_session(username, password)
 
+print("Call modern")
+sesh.get("http://connect.garmin.com/modern")
+print("Finish modern")
+print("Call legacy session")
+sesh.get("https://connect.garmin.com/legacy/session")
+print("Finish legacy session")
+
 if not os.path.isdir(args.directory):
     os.mkdir(args.directory)
 
@@ -178,321 +188,197 @@ total_downloaded = 0
 # This while loop will download data from the server in multiple chunks,
 # if necessary.
 
-with open(csv_fullpath, 'ab') as csv_file:
+while total_downloaded < total_to_download:
+    # Maximum of 100... 400 return status if over 100.  So download 100 or
+    # whatever remains if less than 100.
+    if total_to_download - total_downloaded > 100:
+        num_to_download = 100
+    else:
+        num_to_download = total_to_download - total_downloaded
 
-    # Write header to CSV file
-    if not csv_existed:
-        csv_file.write(
-            "Activity ID,"
-            "Activity Name,"
-            "Description,"
-            "Begin Timestamp,"
-            "Begin Timestamp (Raw Milliseconds),"
-            "End Timestamp,"
-            "End Timestamp (Raw Milliseconds),"
-            "Device,"
-            "Activity Parent,"
-            "Activity Type,"
-            "Event Type,"
-            "Activity Time Zone,"
-            "Max. Elevation,"
-            "Max. Elevation (Raw),"
-            "Begin Latitude (Decimal Degrees Raw),"
-            "Begin Longitude (Decimal Degrees Raw),"
-            "End Latitude (Decimal Degrees Raw),"
-            "End Longitude (Decimal Degrees Raw),"
-            "Average Moving Speed,"
-            "Average Moving Speed (Raw),"
-            "Max. Heart Rate (bpm),"
-            "Average Heart Rate (bpm),"
-            "Max. Speed,"
-            "Max. Speed (Raw),"
-            "Calories,"
-            "Calories (Raw),"
-            "Duration (h:m:s),"
-            "Duration (Raw Seconds),"
-            "Moving Duration (h:m:s),"
-            "Moving Duration (Raw Seconds),"
-            "Average Speed,"
-            "Average Speed (Raw),"
-            "Distance,"
-            "Distance (Raw),"
-            "Max. Heart Rate (bpm),"
-            "Min. Elevation,"
-            "Min. Elevation (Raw),"
-            "Elevation Gain,"
-            "Elevation Gain (Raw),"
-            "Elevation Loss,"
-            "Elevation Loss (Raw)\n".encode("utf-8")
-        )
+    search_params = {'start': total_downloaded, 'limit': num_to_download}
 
-    while total_downloaded < total_to_download:
-        # Maximum of 100... 400 return status if over 100.  So download 100 or
-        # whatever remains if less than 100.
-        if total_to_download - total_downloaded > 100:
-            num_to_download = 100
+    # Query Garmin Connect
+    # TODO: Catch possible exceptions here.
+    json_results = sesh.get(url_gc_search, params=search_params).json()
+    #print(json_results['results'].keys())
+    #search = json_results['results']['search']
+
+    if download_all:
+        # Modify total_to_download based on how many activities the server
+        # reports.
+        total_to_download = int(json_results['results']['totalFound'])
+        # Do it only once.
+        download_all = False
+
+    # Pull out just the list of activities.
+    activities = json_results['results']['activities']
+
+    # Process each activity.
+    for a in activities:
+        A = a['activity']
+        aSummary = A['activitySummary']
+
+        # Display which entry we're working on.
+        info = {
+            "id": A['activityId'],
+            "name": A['activityName'],
+            "timestamp": aSummary['BeginTimestamp']['display'],
+            "duration": "??:??:??",
+            "distance": "0.00 Miles"
+        }
+
+        if "SumElapsedDuration" in aSummary:
+            info["duration"] = aSummary["SumElapsedDuration"]["display"]
+
+        if "SumDistance" in A['activitySummary']:
+            info["distance"] = aSummary["SumDistance"]["withUnit"]
+
+        logging.info("Garmin Connect activity: [{id}] {name}\n"
+                     "\t{timestamp}, {duration}, {distance}"
+                     .format(**info))
+
+        if args.format == "gpx":
+            data_filename = "activity_{}.gpx".format(info["id"])
+            download_url = ("{}{}?full=true"
+                            .format(url_gc_gpx_activity, info["id"]))
+            file_mode = 'w'
+
+        elif args.format == "tcx":
+            data_filename = "activity_{}.tcx".format(info["id"])
+
+            download_url = ("{}{}?full=true"
+                            .format(url_gc_tcx_activity, info["id"]))
+            file_mode = 'w'
+
+        elif args.format == "json":
+            data_filename = "activity_{}.json".format(info["id"])
+            file_mode = 'w'
+
+        elif args.format == "original":
+            data_filename = "activity_{}.zip".format(info["id"])
+
+            fit_filename = info["id"] + ".fit"
+
+            download_url = url_gc_original_activity + info["id"]
+            file_mode = 'wb'
         else:
-            num_to_download = total_to_download - total_downloaded
+            raise Exception('Unrecognized format.')
 
-        search_params = {'start': total_downloaded, 'limit': num_to_download}
+        # file_path is the full path of the activity file to write
+        file_path = args.directory + "/" + data_filename
 
-        # Query Garmin Connect
-        # TODO: Catch possible exceptions here.
-        json_results = sesh.get(url_gc_search, params=search_params).json()
+        # Increase the count now, since we want to count skipped files.
+        total_downloaded += 1
 
-        search = json_results['results']['search']
-
-        if download_all:
-            # Modify total_to_download based on how many activities the server
-            # reports.
-            total_to_download = int(search['totalFound'])
-            # Do it only once.
-            download_all = False
-
-        # Pull out just the list of activities.
-        activities = json_results['results']['activities']
-
-        # Process each activity.
-        for a in activities:
-            A = a['activity']
-
-            # Display which entry we're working on.
-            info = {
-                "id": A['activityId'],
-                "name": A['activityName']['value'],
-                "timestamp": A['beginTimestamp']['display'],
-                "duration": "??:??:??",
-                "distance": "0.00 Miles"
-            }
-
-            if "sumElapsedDuration" in A:
-                info["duration"] = A["sumElapsedDuration"]["display"]
-
-            if "sumDistance" in A:
-                info["distance"] = A["sumDistance"]["withUnit"]
-
-            logging.info("Garmin Connect activity: [{id}] {name}\n"
-                         "\t{timestamp}, {duration}, {distance}"
-                         .format(**info))
-
-            if args.format == "gpx":
-                data_filename = "activity_{}.gpx".format(info["id"])
-                download_url = ("{}{}?full=true"
-                                .format(url_gc_gpx_activity, info["id"]))
-                file_mode = 'w'
-
-            elif args.format == "tcx":
-                data_filename = "activity_{}.tcx".format(info["id"])
-
-                download_url = ("{}{}?full=true"
-                                .format(url_gc_tcx_activity, info["id"]))
-                file_mode = 'w'
-
-            elif args.format == "json":
-                data_filename = "activity_{}.json".format(info["id"])
-                file_mode = 'w'
-
-            elif args.format == "original":
-                data_filename = "activity_{}.zip".format(info["id"])
-
-                fit_filename = info["id"] + ".fit"
-
-                download_url = url_gc_original_activity + info["id"]
-                file_mode = 'wb'
-            else:
-                raise Exception('Unrecognized format.')
-
-            # file_path is the full path of the activity file to write
-            file_path = args.directory + "/" + data_filename
-
-            # Increase the count now, since we want to count skipped files.
-            total_downloaded += 1
-
-            if args.format == "json":
-                with open(file_path, file_mode) as save_file:
-                    save_file.write(json.dumps(A, indent=2))
-                continue
-
-            if (os.path.isfile(file_path) or
-                    # Regardless of unzip setting, don't redownload if the
-                    # ZIP or FIT file exists.
-                    (args.format == 'original' and
-                        os.path.isfile(fit_filename))):
-                logging.info('%s already exists; skipping...', data_filename)
-                continue
-
-            # Download the data file from Garmin Connect.
-            # If the download fails (e.g., due to timeout), this script will
-            # die, but nothing will have been written to disk about this
-            # activity, so just running it again should pick up where it left
-            # off.
-            logging.info('Downloading activity...')
-
-            try:
-                empty_file = False
-                file_response = sesh.get(download_url)
-
-            except requests.HTTPError as e:
-
-                # Handle expected (though unfortunate) error codes; die on
-                # unexpected ones.
-                if e.code == 500 and args.format == 'tcx':
-                    # Garmin will give an internal server error (HTTP 500) when
-                    # downloading TCX files if the original was a manual GPX
-                    # upload. Writing an empty file prevents this file from
-                    # being redownloaded, similar to the way GPX files are
-                    # saved even when there are no tracks. One could be
-                    # generated here, but that's a bit much. Use the GPX format
-                    # if you want actual data in every file, as I believe
-                    # Garmin provides a GPX file for every activity.
-                    logging.info("Writing empty file since Garmin did not"
-                                 " generate a TCX file for this activity...")
-                    empty_file = True
-
-                elif e.code == 404 and args.format == 'original':
-                    # For manual activities (i.e., entered in online without a
-                    # file upload), there is no original file.
-                    # Write an empty file to prevent redownloading it.
-                    logging.info("Writing empty file since there"
-                                 " was no original activity data...")
-                    empty_file = True
-                else:
-                    raise Exception(
-                        "Failed. Got an unexpected HTTP error ({})."
-                        .format(str(e.code))
-                    )
-
-            if empty_file:
-                data = ""
-            elif "b" in file_mode:
-                # if response contains binary data, i.e. file_mode is "wb"
-                data = file_response.content
-            else:
-                # otherwise, data is (auto-detected, most likely utf8)
-                # encoded text
-                data = file_response.text
-                if py2:
-                    # in python 2 we need to explicitly encode the unicode
-                    #  into something that can be written to a file.
-                    # If we don't do this then the write will fail for
-                    #  many non-english characters.
-                    data = data.encode(file_response.encoding)
-
+        if args.format == "json":
             with open(file_path, file_mode) as save_file:
-                save_file.write(data)
+                save_file.write(json.dumps(A, indent=2))
+            continue
 
-            if args.format == 'gpx':
-                # Validate GPX data. If we have an activity without GPS data
-                # (e.g., running on a treadmill), Garmin Connect still kicks
-                # out a GPX, but there is only activity information,
-                # no GPS data. N.B. You can omit the XML parse
-                # (and the associated log messages) to speed things up.
-                try:
-                    # Sometimes trying to parse the gpx file or find a trkpt
-                    #  tag raises an exception.  We handle this here so it won't
-                    #  stop the script.
-                    gpx = parseString(data)
-                    gpx_data_exists = len(gpx.getElementsByTagName('trkpt')) > 0
-                except:
-                    gpx_data_exists = False
+        if (os.path.isfile(file_path) or
+                # Regardless of unzip setting, don't redownload if the
+                # ZIP or FIT file exists.
+                (args.format == 'original' and
+                    os.path.isfile(fit_filename))):
+            logging.info('%s already exists; skipping...', data_filename)
+            continue
 
-                if gpx_data_exists:
-                    logging.info('Done. GPX data saved.')
-                else:
-                    logging.info('Done. No track points found.')
+        # Download the data file from Garmin Connect.
+        # If the download fails (e.g., due to timeout), this script will
+        # die, but nothing will have been written to disk about this
+        # activity, so just running it again should pick up where it left
+        # off.
+        logging.info('Downloading activity...')
 
-            elif args.format == 'original':
-                # Even manual upload of a GPX file is zipped, but we'll
-                # validate the extension.
-                if (args.unzip and
-                        file_path[-3:].lower() == 'zip' and
-                        os.stat(file_path).st_size > 0):
-                    logging.info("Unzipping and removing original files...")
-                    zip_file = open(file_path, 'rb')
-                    z = zipfile.ZipFile(zip_file)
-                    for name in z.namelist():
-                        z.extract(name, args.directory)
+        try:
+            empty_file = False
+            file_response = sesh.get(download_url)
 
-                    zip_file.close()
-                    os.remove(file_path)
+        except requests.HTTPError as e:
 
-            if not empty_file:
-                # Write stats to CSV.
-                empty_record = '"",'
+            # Handle expected (though unfortunate) error codes; die on
+            # unexpected ones.
+            if e.code == 500 and args.format == 'tcx':
+                # Garmin will give an internal server error (HTTP 500) when
+                # downloading TCX files if the original was a manual GPX
+                # upload. Writing an empty file prevents this file from
+                # being redownloaded, similar to the way GPX files are
+                # saved even when there are no tracks. One could be
+                # generated here, but that's a bit much. Use the GPX format
+                # if you want actual data in every file, as I believe
+                # Garmin provides a GPX file for every activity.
+                logging.info("Writing empty file since Garmin did not"
+                             " generate a TCX file for this activity...")
+                empty_file = True
 
-                csv_record = ''
+            elif e.code == 404 and args.format == 'original':
+                # For manual activities (i.e., entered in online without a
+                # file upload), there is no original file.
+                # Write an empty file to prevent redownloading it.
+                logging.info("Writing empty file since there"
+                             " was no original activity data...")
+                empty_file = True
+            else:
+                raise Exception(
+                    "Failed. Got an unexpected HTTP error ({})."
+                    .format(str(e.code))
+                )
 
-                def field_format(key1, key2=None):
-                    if key2:
-                        return (empty_record if key1 not in A
-                                else '"' + A[key1][key2].replace('"', '""') +
-                                '",')
-                    else:
-                        return (empty_record if key1 not in A
-                                else '"' + A[key1].replace('"', '""') + '",')
+        if empty_file:
+            data = ""
+        elif "b" in file_mode:
+            # if response contains binary data, i.e. file_mode is "wb"
+            data = file_response.content
+        else:
+            # otherwise, data is (auto-detected, most likely utf8)
+            # encoded text
+            data = file_response.text
+            if py2:
+                # in python 2 we need to explicitly encode the unicode
+                #  into something that can be written to a file.
+                # If we don't do this then the write will fail for
+                #  many non-english characters.
+                data = data.encode(file_response.encoding)
 
-                csv_record += field_format('activityId')
-                csv_record += field_format('activityName', 'value')
-                csv_record += field_format('activityDescription', 'value')
-                csv_record += field_format('beginTimestamp', 'display')
-                csv_record += field_format('beginTimestamp', 'millis')
-                csv_record += field_format('endTimestamp', 'display')
-                csv_record += field_format('endTimestamp', 'millis')
+        with open(file_path, file_mode) as save_file:
+            save_file.write(data)
 
-                csv_record += (empty_record if 'device' not in A
-                               else '"' +
-                               A['device']['display'].replace('"', '""') +
-                               ' ' +
-                               A['device']['version'].replace('"', '""') +
-                               '",')
+        if args.format == 'gpx':
+            # Validate GPX data. If we have an activity without GPS data
+            # (e.g., running on a treadmill), Garmin Connect still kicks
+            # out a GPX, but there is only activity information,
+            # no GPS data. N.B. You can omit the XML parse
+            # (and the associated log messages) to speed things up.
+            try:
+                # Sometimes trying to parse the gpx file or find a trkpt
+                #  tag raises an exception.  We handle this here so it won't
+                #  stop the script.
+                gpx = parseString(data)
+                gpx_data_exists = len(gpx.getElementsByTagName('trkpt')) > 0
+            except:
+                gpx_data_exists = False
 
-                csv_record += (empty_record if 'activityType' not in A
-                               else '"' +
-                               A['activityType']['parent']['display']
-                               .replace('"', '""') + '",')
+            if gpx_data_exists:
+                logging.info('Done. GPX data saved.')
+            else:
+                logging.info('Done. No track points found.')
 
-                csv_record += field_format('activityType', 'display')
-                csv_record += field_format('eventType', 'display')
-                csv_record += field_format('activityTimeZone', 'display')
-                csv_record += field_format('maxElevation', 'withUnit')
-                csv_record += field_format('maxElevation', 'value')
-                csv_record += field_format('beginLatitude', 'value')
-                csv_record += field_format('beginLongitude', 'value')
-                csv_record += field_format('endLatitude', 'value')
-                csv_record += field_format('endLongitude', 'value')
+        elif args.format == 'original':
+            # Even manual upload of a GPX file is zipped, but we'll
+            # validate the extension.
+            if (args.unzip and
+                    file_path[-3:].lower() == 'zip' and
+                    os.stat(file_path).st_size > 0):
+                logging.info("Unzipping and removing original files...")
+                zip_file = open(file_path, 'rb')
+                z = zipfile.ZipFile(zip_file)
+                for name in z.namelist():
+                    z.extract(name, args.directory)
 
-                # The units vary between Minutes per Mile and mph, but withUnit
-                # always displays "Minutes per Mile"
-                csv_record += field_format('weightedMeanMovingSpeed', 'display')
-                csv_record += field_format('weightedMeanMovingSpeed', 'value')
-                csv_record += field_format('maxHeartRate', 'display')
+                zip_file.close()
+                os.remove(file_path)
 
-                csv_record += field_format('weightedMeanHeartRate', 'display')
-
-                # The units vary between Minutes per Mile and mph, but withUnit
-                # always displays "Minutes per Mile"
-                csv_record += field_format('maxSpeed', 'display')
-
-                csv_record += field_format('sumEnergy', 'display')
-                csv_record += field_format('sumEnergy', 'value')
-                csv_record += field_format('sumElapsedDuration', 'display')
-                csv_record += field_format('sumElapsedDuration', 'value')
-                csv_record += field_format('sumMovingDuration', 'display')
-                csv_record += field_format('sumMovingDuration', 'value')
-                csv_record += field_format('weightedMeanSpeed', 'withUnit')
-                csv_record += field_format('weightedMeanSpeed', 'value')
-                csv_record += field_format('sumDistance', 'withUnit')
-                csv_record += field_format('sumDistance', 'value')
-                csv_record += field_format('minHeartRate', 'display')
-                csv_record += field_format('minElevation', 'withUnit')
-                csv_record += field_format('minElevation', 'value')
-                csv_record += field_format('gainElevation', 'withUnit')
-                csv_record += field_format('gainElevation', 'value')
-                csv_record += field_format('lossElevation', 'withUnit')
-                csv_record += field_format('lossElevation', 'value')
-                csv_record += '\n'
-
-                csv_file.write(csv_record.encode("utf-8"))
-        # End while loop for multiple chunks.
+    # End while loop for multiple chunks.
     logging.info("Chunk done!")
 logging.info('Done!')
