@@ -87,10 +87,11 @@ limit_maximum = 100
 
 # URLs for various services.
 REDIRECT = "https://connect.garmin.com/post-auth/login"
-BASE_URL = "http://connect.garmin.com/en-US/signin"
-GAUTH = "http://connect.garmin.com/gauth/hostname"
+BASE_URL = "https://connect.garmin.com/en-US/signin"
+GAUTH = "https://connect.garmin.com/gauth/hostname"
 SSO = "https://sso.garmin.com/sso"
-CSS = "https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.1-min.css"
+CSS = ("https://static.garmincdn.com/com.garmin.connect/ui/css/"
+       "gauth-custom-v1.1-min.css")
 
 data = {'service': REDIRECT,
         'webhost': 'olaxpw-connect04',
@@ -117,12 +118,12 @@ url_gc_login = 'https://sso.garmin.com/sso/login?' + urlencode(data)
 
 url_gc_post_auth = 'https://connect.garmin.com/post-auth/login?'
 
-url_gc_search = 'http://connect.garmin.com/proxy/activity-search-service-1.2/json/activities?'
+url_gc_search = 'https://connect.garmin.com/proxy/activity-search-service-1.2/json/activities?'
 #url_gc_gpx_activity = 'http://connect.garmin.com/proxy/activity-service-1.1/gpx/activity/'
 url_gc_gpx_activity = 'https://connect.garmin.com/modern/proxy/download-service/export/gpx/activity/'
 #url_gc_tcx_activity = 'http://connect.garmin.com/proxy/activity-service-1.2/tcx/activity/'
 url_gc_tcx_activity = 'https://connect.garmin.com/modern/proxy/download-service/export/tcx/activity/'
-url_gc_original_activity = 'http://connect.garmin.com/proxy/download-service/files/activity/'
+url_gc_original_activity = 'https://connect.garmin.com/proxy/download-service/files/activity/'
 
 
 def logged_in_session(username, password):
@@ -169,7 +170,7 @@ def logged_in_session(username, password):
 sesh = logged_in_session(username, password)
 
 print("Call modern")
-sesh.get("http://connect.garmin.com/modern")
+sesh.get("https://connect.garmin.com/modern")
 print("Finish modern")
 print("Call legacy session")
 sesh.get("https://connect.garmin.com/legacy/session")
