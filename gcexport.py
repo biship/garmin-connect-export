@@ -27,39 +27,45 @@ DEFAULT_DIRECTORY = './' + CURRENT_DATE + '_garmin_connect_export'
 
 py2 = sys.version_info[0] < 3  # is this python 2?
 
-parser = argparse.ArgumentParser()
 
-parser.add_argument('--username',
-                    help=('your Garmin Connect username '
-                          '(otherwise, you will be prompted)'),
-                    nargs='?')
+def parse_args():
 
-parser.add_argument('--password',
-                    help=('your Garmin Connect password '
-                          '(otherwise, you will be prompted)'),
-                    nargs='?')
+    parser = argparse.ArgumentParser()
 
-parser.add_argument('-c', '--count', nargs='?', default='1',
-                    help=("number of recent activities to download, or 'all'"
-                          ' (default: 1)'))
+    parser.add_argument('--username',
+                        help=('your Garmin Connect username '
+                              '(otherwise, you will be prompted)'),
+                        nargs='?')
+
+    parser.add_argument('--password',
+                        help=('your Garmin Connect password '
+                              '(otherwise, you will be prompted)'),
+                        nargs='?')
+
+    parser.add_argument('-c', '--count', nargs='?', default='1',
+                        help=('number of recent activities to download,'
+                              " or 'all' (default: 1)"))
 
 
-parser.add_argument('-f', '--format', nargs='?',
-                    choices=['gpx', 'tcx', 'original', 'json'], default='gpx',
-                    help=("export format; can be 'gpx', 'tcx',"
-                          " 'original', or 'json' (default: 'gpx')"))
+    parser.add_argument('-f', '--format', nargs='?', default='gpx',
+                        choices=['gpx', 'tcx', 'original', 'json'],
+                        help=("export format; can be 'gpx', 'tcx',"
+                              " 'original', or 'json' (default: 'gpx')"))
 
-parser.add_argument('-d', '--directory', nargs='?',
-                    default=DEFAULT_DIRECTORY,
-                    help=('the directory to export to'
-                          " (default: './YYYY-MM-DD_garmin_connect_export')"))
+    parser.add_argument('-d', '--directory', nargs='?',
+                        default=DEFAULT_DIRECTORY,
+                        help=('the directory to export to (default:'
+                              " './YYYY-MM-DD_garmin_connect_export')"))
 
-parser.add_argument('-u', '--unzip',
-                    help=("if downloading ZIP files (format: 'original'),"
-                          ' unzip the file and removes the ZIP file'),
-                    action='store_true')
+    parser.add_argument('-u', '--unzip',
+                        help=("if downloading ZIP files (format: 'original'),"
+                              ' unzip the file and removes the ZIP file'),
+                        action='store_true')
 
-args = parser.parse_args()
+    return parser.parse_args()
+
+
+args = parse_args()
 
 logging.info('Welcome to Garmin Connect Exporter!')
 
