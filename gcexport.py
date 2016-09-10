@@ -24,7 +24,6 @@ logging.basicConfig(  # filename='import_{}.log'.format(CURRENT_DATE),
 
 
 DEFAULT_DIRECTORY = './' + CURRENT_DATE + '_garmin_connect_export'
-CSV_FILENAME = 'activities.csv'
 
 py2 = sys.version_info[0] < 3  # is this python 2?
 
@@ -78,8 +77,7 @@ else:
 # Create directory for data files.
 if os.path.isdir(args.directory):
     logging.info('Warning: Output directory already exists.'
-                 ' Will skip already-downloaded files and append to the'
-                 ' CSV file.')
+                 ' Will skip already-downloaded files.')
 
 # Maximum number of activities you can request at once.  Set and enforced
 # by Garmin.
@@ -87,9 +85,9 @@ limit_maximum = 100
 
 # URLs for various services.
 GC_CONNECT = 'https://connect.garmin.com/'
-REDIRECT = 'https://connect.garmin.com/post-auth/login'
-BASE_URL = 'https://connect.garmin.com/en-US/signin'
-GAUTH = 'https://connect.garmin.com/gauth/hostname'
+REDIRECT = GC_CONNECT + 'post-auth/login'
+BASE_URL = GC_CONNECT + 'en-US/signin'
+GAUTH = GC_CONNECT + 'gauth/hostname'
 SSO = 'https://sso.garmin.com/sso'
 CSS = ('https://static.garmincdn.com/com.garmin.connect/ui/css/'
        'gauth-custom-v1.1-min.css')
@@ -118,12 +116,16 @@ data = {'service': REDIRECT,
 
 url_gc_login = 'https://sso.garmin.com/sso/login?' + urlencode(data)
 
-url_gc_post_auth = 'https://connect.garmin.com/post-auth/login?'
+url_gc_post_auth = GC_CONNECT + 'post-auth/login?'
 
-url_gc_search = 'https://connect.garmin.com/proxy/activity-search-service-1.2/json/activities?'
-url_gc_gpx_activity = 'https://connect.garmin.com/modern/proxy/download-service/export/gpx/activity/'
-url_gc_tcx_activity = 'https://connect.garmin.com/modern/proxy/download-service/export/tcx/activity/'
-url_gc_original_activity = 'https://connect.garmin.com/proxy/download-service/files/activity/'
+url_gc_search = (GC_CONNECT
+                 + 'proxy/activity-search-service-1.2/json/activities?')
+url_gc_gpx_activity = (GC_CONNECT
+                       + 'modern/proxy/download-service/export/gpx/activity/')
+url_gc_tcx_activity = (GC_CONNECT
+                       + 'modern/proxy/download-service/export/tcx/activity/')
+url_gc_original_activity = (GC_CONNECT
+                            + 'proxy/download-service/files/activity/')
 
 
 def logged_in_session(username, password):
@@ -170,18 +172,14 @@ def logged_in_session(username, password):
 sesh = logged_in_session(username, password)
 
 print('Call modern')
-sesh.get('https://connect.garmin.com/modern')
+sesh.get(GC_CONNECT + 'modern')
 print('Finish modern')
 print('Call legacy session')
-sesh.get('https://connect.garmin.com/legacy/session')
+sesh.get(GC_CONNECT + 'legacy/session')
 print('Finish legacy session')
 
 if not os.path.isdir(args.directory):
     os.mkdir(args.directory)
-
-csv_fullpath = args.directory + '/' + CSV_FILENAME
-
-csv_existed = os.path.isfile(csv_fullpath)
 
 download_all = False
 
