@@ -65,12 +65,14 @@ args = parser.parse_args()
 logging.info('Welcome to Garmin Connect Exporter!')
 
 
-if args.username:
-    username = args.username
-else:
-    username = raw_input('Username: ') if py2 else input('Username: ')
+username = args.username if args.username else input('Username: ')
 
-password = args.password if args.password else getpass()
+if args.password:
+    password = args.password
+elif os.path.isfile('password.txt'):
+    password = open('password.txt').read()
+else:
+    password = getpass()
 
 
 # Create directory for data files.
