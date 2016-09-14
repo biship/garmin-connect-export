@@ -14,11 +14,13 @@ import zipfile
 import logging
 import json
 from urllib.parse import urlencode
+from importlib import reload
 
 
 CURRENT_DATE = datetime.now().strftime('%Y-%m-%d')
 
-logging.basicConfig(  # filename='import_{}.log'.format(CURRENT_DATE),
+reload(logging)
+logging.basicConfig(filename='import_{}.log'.format(CURRENT_DATE),
     format='%(levelname)s:%(message)s',
     level=logging.DEBUG)  # use level=logging.INFO for less verbosity
 
@@ -65,20 +67,26 @@ def parse_args():
     return parser.parse_args()
 
 
-args = parse_args()
+class MyArgs(object):
+    """Convert argument dictionary to the object with the same attributes."""
+    def __init__(self, **args):
+        self.__dict__.update(args)
+
+# Try to load arguments from local json file
+with open('gc_export_task.json') as file:
+    try:
+        args = MyArgs(**json.load(file))
+    except:
+        args = None
+
+if args is None:
+    args = parse_args()
+
 
 logging.info('Welcome to Garmin Connect Exporter!')
 
-
 username = args.username if args.username else input('Username: ')
-
-if args.password:
-    password = args.password
-elif os.path.isfile('password.txt'):
-    password = open('password.txt').read()
-else:
-    password = getpass()
-
+password = args.password if args.password else getpass()
 
 # Create directory for data files.
 if os.path.isdir(args.directory):
@@ -168,12 +176,12 @@ def logged_in_session(username, password):
 # We should be logged in now.
 sesh = logged_in_session(username, password)
 
-print('Call modern')
+logging.info('Call modern')
 sesh.get(GCU + 'modern')
-print('Finish modern')
-print('Call legacy session')
+logging.info('Finish modern')
+logging.info('Call legacy session')
 sesh.get(GCU + 'legacy/session')
-print('Finish legacy session')
+logging.info('Finish legacy session')
 
 if not os.path.isdir(args.directory):
     os.mkdir(args.directory)
